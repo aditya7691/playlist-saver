@@ -2,7 +2,7 @@
 
 **[Open Playlist Saver](https://aditya7691.github.io/playlist-saver/)**
 
-Download a YouTube playlist directly into a folder on your Windows PC.
+Download a YouTube or YouTube Music playlist as videos or MP3 audio directly into a folder on your Windows PC.
 
 ## First time
 
@@ -20,6 +20,14 @@ The GitHub page carries your link and quality to the helper page. Confirm **Down
 Videos are numbered in playlist order inside a playlist subfolder. Quality is an upper limit; the source may be lower. Merged video/audio uses MKV; combined source files may retain their original extension. VLC can play these files.
 
 Run again with the same folder to resume. Completed video IDs are remembered in `.playlist-saver-history.txt`. To download completed videos at another quality, choose a new destination. The destination resets to Downloads/Playlists when the helper restarts.
+
+## YouTube Music and audio-only downloads
+
+Paste the playlist's Share link (music.youtube.com/playlist?list=… works), select **Audio only · MP3**, choose 128, 192, or 320 kbps or best variable bitrate, then download. Tracks are numbered in playlist order under **Audio / playlist name** inside your selected folder. Higher MP3 settings cannot improve the original source quality.
+
+Audio and video use separate download histories, so a previously saved video can also be downloaded as audio. Audio quality changes still skip completed tracks; choose another destination to download them again. Public and accessible unlisted playlists work; private and sign-in-required playlists are not supported.
+
+After updating helper.py, close the running helper and reopen Start.cmd, then refresh the page.
 
 ## Troubleshooting
 

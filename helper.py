@@ -47,26 +47,38 @@ def canonical_url(value):
     return 'https://www.youtube.com/playlist?list=' + playlist
 
 
-def download_args(url, folder, quality, ffmpeg):
-    if quality not in {'360', '480', '720', '1080', 'best'}:
-        raise ValueError('Choose a supported video quality.')
+def validate_options(mode, quality):
+    choices = {'video': {'360', '480', '720', '1080', 'best'},
+               'audio': {'128', '192', '320', 'best'}}
+    if mode not in choices or quality not in choices[mode]:
+        raise ValueError('Choose a supported download type and quality.')
+
+
+def download_args(url, folder, quality, ffmpeg, mode='video'):
+    validate_options(mode, quality)
     cap = '' if quality == 'best' else f'[height<={quality}]'
+    audio = mode == 'audio'
+    archive = '.playlist-saver-audio-history.txt' if audio else '.playlist-saver-history.txt'
+    destination = folder / 'Audio' if audio else folder
+    format_args = (['-f', 'bestaudio/best', '-x', '--audio-format', 'mp3',
+                    '--audio-quality', '0' if quality == 'best' else quality + 'K']
+                   if audio else ['-f', f'bv*{cap}+ba/b{cap}', '--merge-output-format', 'mkv'])
     return [sys.executable, '-m', 'yt_dlp', '--ignore-config', '--yes-playlist', '--newline', '--no-color',
             '--progress', '--no-simulate', '--ignore-errors', '--continue', '--windows-filenames',
             '--no-overwrites', '--ffmpeg-location', ffmpeg,
-            '--download-archive', str(folder / '.playlist-saver-history.txt'),
+            '--download-archive', str(folder / archive),
             '--progress-template', 'download:PS_PROGRESS:%(progress._percent_str)s|%(info.title)s',
             '--print', 'after_move:PS_DONE:%(filepath)s',
-            '-f', f'bv*{cap}+ba/b{cap}', '--merge-output-format', 'mkv',
-            '-o', str(folder / '%(playlist_title).120B' / '%(playlist_index)03d - %(title).120B [%(id)s].%(ext)s'),
+            *format_args,
+            '-o', str(destination / '%(playlist_title).120B' / '%(playlist_index)03d - %(title).120B [%(id)s].%(ext)s'),
             '--', url]
 
 
-def worker(url, folder, quality):
+def worker(url, folder, quality, mode='video'):
     global PROCESS
     try:
         import imageio_ffmpeg
-        args = download_args(url, folder, quality, imageio_ffmpeg.get_ffmpeg_exe())
+        args = download_args(url, folder, quality, imageio_ffmpeg.get_ffmpeg_exe(), mode)
         if CANCEL.is_set():
             return
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -107,7 +119,7 @@ def worker(url, folder, quality):
             elif code or STATE['errors']:
                 STATE['status'] = 'Finished with errors — see activity for details.'
             else:
-                STATE['status'] = 'Complete — videos are saved in your folder.'
+                STATE['status'] = 'Complete — audio files are saved in your Audio folder.' if mode == 'audio' else 'Complete — videos are saved in your folder.'
     except Exception as exc:
         with LOCK:
             LOG.append(str(exc))
@@ -181,9 +193,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Invalid request.')
             if self.path == '/api/start':
                 url = canonical_url(data.get('url', ''))
-                quality = str(data.get('quality', '720'))
-                if quality not in {'360', '480', '720', '1080', 'best'}:
-                    raise ValueError('Choose a supported video quality.')
+                mode = str(data.get('mode', 'video'))
+                quality = str(data.get('quality', '192' if mode == 'audio' else '720'))
+                validate_options(mode, quality)
                 with LOCK:
                     if STATE['running']:
                         return self.reply({'error': 'A download is already running.'}, 409)
@@ -192,7 +204,7 @@ class Handler(BaseHTTPRequestHandler):
                     CANCEL.clear()
                     LOG.clear()
                     STATE.update(running=True, status='Connecting to YouTube…', percent=0, current='', completed=0, errors=0)
-                    threading.Thread(target=worker, args=(url, folder, quality), daemon=True).start()
+                    threading.Thread(target=worker, args=(url, folder, quality, mode), daemon=True).start()
                 return self.reply({'ok': True})
             if self.path == '/api/stop':
                 with LOCK:
