@@ -23,6 +23,7 @@ Run again with the same folder to resume. Completed video IDs are remembered in 
 
 ## Troubleshooting
 
+- **Access denied / WinError 5:** the helper now checks that it can create files and subfolders before starting. Choose a writable folder. If the helper was launched from the chat, close that helper and open Start.cmd yourself from File Explorer so it runs with your normal Windows folder access. Administrator access is not needed.
 - **Can't reach the page:** open Start.cmd and keep its window open. Local address: http://127.0.0.1:17869/
 - **YouTube changes:** close the helper, run Update.cmd, then reopen Start.cmd.
 - **Runtime setup failed:** check the internet connection and reopen Start.cmd, or install [Deno](https://deno.com/) yourself. The automatic runtime setup supports 64-bit Intel/AMD Windows.
