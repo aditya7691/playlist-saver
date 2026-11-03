@@ -16,6 +16,8 @@ BASE = Path(__file__).resolve().parent
 PORT = 17869
 ORIGIN = f'http://127.0.0.1:{PORT}'
 TOKEN = secrets.token_urlsafe(32)
+API_VERSION = 2
+SUPPORTED_MODES = ['video', 'audio']
 LOCK = threading.RLock()
 STATE = {'running': False, 'status': 'Ready', 'folder': str(Path.home() / 'Downloads' / 'Playlists'), 'percent': 0, 'current': '', 'completed': 0, 'errors': 0}
 LOG = deque(maxlen=200)
@@ -177,7 +179,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get('X-Playlist-Token') != TOKEN:
                 return self.reply({'error': 'Reopen the downloader page.'}, 403)
             with LOCK:
-                return self.reply({**STATE, 'log': list(LOG)})
+                return self.reply({**STATE, 'log': list(LOG), 'api_version': API_VERSION, 'supported_modes': SUPPORTED_MODES})
         return self.reply({'error': 'Not found'}, 404)
 
     def do_POST(self):
@@ -193,7 +195,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Invalid request.')
             if self.path == '/api/start':
                 url = canonical_url(data.get('url', ''))
-                mode = str(data.get('mode', 'video'))
+                if data.get('api_version') != API_VERSION:
+                    return self.reply({'error': 'Refresh this page to load the latest downloader controls.'}, 409)
+                mode = str(data.get('mode', ''))
                 quality = str(data.get('quality', '192' if mode == 'audio' else '720'))
                 validate_options(mode, quality)
                 with LOCK:
@@ -203,9 +207,10 @@ class Handler(BaseHTTPRequestHandler):
                     check_destination(folder)
                     CANCEL.clear()
                     LOG.clear()
-                    STATE.update(running=True, status='Connecting to YouTube…', percent=0, current='', completed=0, errors=0)
+                    STATE.update(running=True, status='Downloading MP3 audio…' if mode == 'audio' else 'Downloading video…', percent=0, current='', completed=0, errors=0, mode=mode, quality=quality)
+                    LOG.append('Starting MP3 audio download.' if mode == 'audio' else 'Starting video download.')
                     threading.Thread(target=worker, args=(url, folder, quality, mode), daemon=True).start()
-                return self.reply({'ok': True})
+                return self.reply({'ok': True, 'mode': mode, 'output_format': 'mp3' if mode == 'audio' else 'video'})
             if self.path == '/api/stop':
                 with LOCK:
                     if STATE['running']:

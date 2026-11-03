@@ -31,6 +31,8 @@ After updating helper.py, close the running helper and reopen Start.cmd, then re
 
 ## Troubleshooting
 
+- **Audio selected but MKV video saved:** an older helper process can keep running after its files are updated. Stop the download, close its command window, reopen the updated Start.cmd, and refresh the page. The page now checks helper capabilities and confirms the selected download type before starting.
+
 - **Access denied / WinError 5:** the helper now checks that it can create files and subfolders before starting. Choose a writable folder. If the helper was launched from the chat, close that helper and open Start.cmd yourself from File Explorer so it runs with your normal Windows folder access. Administrator access is not needed.
 - **Can't reach the page:** open Start.cmd and keep its window open. Local address: http://127.0.0.1:17869/
 - **YouTube changes:** close the helper, run Update.cmd, then reopen Start.cmd.
