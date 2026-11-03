@@ -23,13 +23,15 @@ Run again with the same folder to resume. Completed video IDs are remembered in 
 
 ## YouTube Music and audio-only downloads
 
-Paste the playlist's Share link (music.youtube.com/playlist?list=… works), select **Audio only · MP3**, choose 128, 192, or 320 kbps or best variable bitrate, then download. Tracks are numbered in playlist order under **Audio / playlist name** inside your selected folder. Higher MP3 settings cannot improve the original source quality.
+Paste the playlist's Share link (music.youtube.com/playlist?list=… works), select **Audio only · MP3**, choose 128, 192, or 320 kbps or best variable bitrate, then download. Tracks are numbered in playlist order under **Audio / quality / playlist name** inside your selected folder. Higher MP3 settings cannot improve the original source quality.
 
-Audio and video use separate download histories, so a previously saved video can also be downloaded as audio. Audio quality changes still skip completed tracks; choose another destination to download them again. Public and accessible unlisted playlists work; private and sign-in-required playlists are not supported.
+Audio and video use separate download histories, so a previously saved video can also be downloaded as audio. Each audio quality has its own folder and download history. Switching from 192 to 320 kbps creates a new 320 kbps copy. Repeating the same quality resumes and skips completed tracks. Existing audio files from earlier app versions remain in their original folders; the updated helper creates quality-specific copies. 192 and 320 kbps are the MP3 encoding bitrates; a higher bitrate cannot restore detail missing from the source. Public and accessible unlisted playlists work; private and sign-in-required playlists are not supported.
 
 After updating helper.py, close the running helper and reopen Start.cmd, then refresh the page.
 
 ## Troubleshooting
+
+- **Changing audio quality reuses the same file:** close the helper, reopen the updated Start.cmd, and refresh the page. Audio quality now has its own folder and history, and the page requires the updated helper before starting.
 
 - **Audio selected but MKV video saved:** an older helper process can keep running after its files are updated. Stop the download, close its command window, reopen the updated Start.cmd, and refresh the page. The page now checks helper capabilities and confirms the selected download type before starting.
 

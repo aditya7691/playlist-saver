@@ -16,7 +16,7 @@ BASE = Path(__file__).resolve().parent
 PORT = 17869
 ORIGIN = f'http://127.0.0.1:{PORT}'
 TOKEN = secrets.token_urlsafe(32)
-API_VERSION = 2
+API_VERSION = 3
 SUPPORTED_MODES = ['video', 'audio']
 LOCK = threading.RLock()
 STATE = {'running': False, 'status': 'Ready', 'folder': str(Path.home() / 'Downloads' / 'Playlists'), 'percent': 0, 'current': '', 'completed': 0, 'errors': 0}
@@ -60,8 +60,9 @@ def download_args(url, folder, quality, ffmpeg, mode='video'):
     validate_options(mode, quality)
     cap = '' if quality == 'best' else f'[height<={quality}]'
     audio = mode == 'audio'
-    archive = '.playlist-saver-audio-history.txt' if audio else '.playlist-saver-history.txt'
-    destination = folder / 'Audio' if audio else folder
+    archive = f'.playlist-saver-audio-{quality}-history.txt' if audio else '.playlist-saver-history.txt'
+    quality_folder = 'Best VBR' if quality == 'best' else quality + ' kbps'
+    destination = folder / 'Audio' / quality_folder if audio else folder
     format_args = (['-f', 'bestaudio/best', '-x', '--audio-format', 'mp3',
                     '--audio-quality', '0' if quality == 'best' else quality + 'K']
                    if audio else ['-f', f'bv*{cap}+ba/b{cap}', '--merge-output-format', 'mkv'])
@@ -121,7 +122,8 @@ def worker(url, folder, quality, mode='video'):
             elif code or STATE['errors']:
                 STATE['status'] = 'Finished with errors — see activity for details.'
             else:
-                STATE['status'] = 'Complete — audio files are saved in your Audio folder.' if mode == 'audio' else 'Complete — videos are saved in your folder.'
+                label = 'Best VBR' if quality == 'best' else quality + ' kbps'
+                STATE['status'] = f'Complete — MP3 files saved in Audio / {label}.' if mode == 'audio' else 'Complete — videos are saved in your folder.'
     except Exception as exc:
         with LOCK:
             LOG.append(str(exc))
@@ -207,10 +209,11 @@ class Handler(BaseHTTPRequestHandler):
                     check_destination(folder)
                     CANCEL.clear()
                     LOG.clear()
-                    STATE.update(running=True, status='Downloading MP3 audio…' if mode == 'audio' else 'Downloading video…', percent=0, current='', completed=0, errors=0, mode=mode, quality=quality)
-                    LOG.append('Starting MP3 audio download.' if mode == 'audio' else 'Starting video download.')
+                    label = 'Best VBR' if quality == 'best' else quality + ' kbps'
+                    STATE.update(running=True, status=f'Downloading MP3 audio at {label}…' if mode == 'audio' else 'Downloading video…', percent=0, current='', completed=0, errors=0, mode=mode, quality=quality)
+                    LOG.append(f'Starting MP3 audio download at {label}. Output: Audio / {label} / playlist name.' if mode == 'audio' else 'Starting video download.')
                     threading.Thread(target=worker, args=(url, folder, quality, mode), daemon=True).start()
-                return self.reply({'ok': True, 'mode': mode, 'output_format': 'mp3' if mode == 'audio' else 'video'})
+                return self.reply({'ok': True, 'mode': mode, 'quality': quality, 'output_format': 'mp3' if mode == 'audio' else 'video'})
             if self.path == '/api/stop':
                 with LOCK:
                     if STATE['running']:
