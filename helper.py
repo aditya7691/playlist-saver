@@ -5,6 +5,7 @@ import secrets
 import subprocess
 import sys
 import threading
+import tempfile
 import webbrowser
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +21,20 @@ STATE = {'running': False, 'status': 'Ready', 'folder': str(Path.home() / 'Downl
 LOG = deque(maxlen=200)
 PROCESS = None
 CANCEL = threading.Event()
+
+
+def check_destination(folder):
+    """Exercise the same create-directory and write operations downloads need."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='.playlist-saver-check-', dir=folder) as probe:
+            (Path(probe) / 'write-test').write_bytes(b'Playlist Saver')
+    except OSError as exc:
+        raise ValueError(
+            f'Cannot save files in {folder}. Choose a writable folder. '
+            'If the helper was started from this chat, close it and open '
+            'Start.cmd from File Explorer, then try again.'
+        ) from exc
 
 
 def canonical_url(value):
@@ -60,6 +75,7 @@ def worker(url, folder, quality):
             PROCESS = proc
             if CANCEL.is_set():
                 proc.terminate()
+        access_denied = False
         for line in proc.stdout:
             line = line.rstrip()
             with LOCK:
@@ -78,9 +94,15 @@ def worker(url, folder, quality):
                     LOG.append(line)
                     if 'ERROR:' in line:
                         STATE['errors'] += 1
+                        if any(text in line.lower() for text in ('access is denied', 'permission denied', 'winerror 5')):
+                            access_denied = True
+                            if proc.poll() is None:
+                                proc.terminate()
         code = proc.wait()
         with LOCK:
-            if CANCEL.is_set():
+            if access_denied:
+                STATE['status'] = 'Stopped: folder access denied. Choose another folder or reopen Start.cmd from File Explorer.'
+            elif CANCEL.is_set():
                 STATE['status'] = 'Stopped — click Download to resume.'
             elif code or STATE['errors']:
                 STATE['status'] = 'Finished with errors — see activity for details.'
@@ -166,7 +188,7 @@ class Handler(BaseHTTPRequestHandler):
                     if STATE['running']:
                         return self.reply({'error': 'A download is already running.'}, 409)
                     folder = Path(STATE['folder']).expanduser().resolve()
-                    folder.mkdir(parents=True, exist_ok=True)
+                    check_destination(folder)
                     CANCEL.clear()
                     LOG.clear()
                     STATE.update(running=True, status='Connecting to YouTube…', percent=0, current='', completed=0, errors=0)
@@ -190,7 +212,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Folder selection timed out. Try again.')
                 with LOCK:
                     if result.get('folder') and not STATE['running']:
-                        STATE['folder'] = result['folder']
+                        candidate = Path(result['folder']).expanduser().resolve()
+                        check_destination(candidate)
+                        STATE['folder'] = str(candidate)
                     return self.reply({'folder': STATE['folder']})
             if self.path == '/api/open':
                 with LOCK:
